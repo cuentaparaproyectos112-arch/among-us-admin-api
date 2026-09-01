@@ -1,6 +1,9 @@
 const express = require("express");
 const cors = require("cors");
 const { Pool } = require("pg");
+const bcrypt = require("bcrypt");
+const multer = require("multer");
+const { createClient } = require("@supabase/supabase-js");
 
 const app = express();
 
@@ -15,6 +18,35 @@ BASE DE DATOS
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+});
+
+/* =========================
+SUPABASE
+========================= */
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SECRET_KEY
+);
+
+/* =========================
+SUBIDA DE IMÁGENES
+========================= */
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+
+  limits: {
+    fileSize: 5 * 1024 * 1024
+  },
+
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype.startsWith("image/")) {
+      return cb(new Error("Solo se permiten imágenes."));
+    }
+
+    cb(null, true);
+  }
 });
 
 /* =========================
@@ -51,7 +83,10 @@ async function iniciarBaseDeDatos() {
     console.log("Tablas verificadas correctamente ✅");
 
   } catch (error) {
-    console.error("Error al conectar con la base de datos:", error);
+    console.error(
+      "Error al conectar con la base de datos:",
+      error
+    );
   }
 }
 
@@ -66,166 +101,81 @@ app.get("/", (req, res) => {
 });
 
 /* =========================
-OBTENER INTEGRANTES
+REGISTRO DE CUENTA
 ========================= */
 
-app.get("/integrantes", async (req, res) => {
-  try {
-    const resultado = await pool.query(
-      "SELECT * FROM integrantes ORDER BY id ASC"
-    );
+app.post(
+  "/registro",
+  upload.single("foto"),
+  async (req, res) => {
 
-    res.json(resultado.rows);
+    try {
+      const {
+        usuario,
+        nombreVisible,
+        contrasena
+      } = req.body;
 
-  } catch (error) {
-    console.error(error);
+      const foto = req.file;
 
-    res.status(500).json({
-      error: "Error al obtener integrantes."
-    });
-  }
-});
+      /* =========================
+      VALIDAR DATOS
+      ========================= */
 
-/* =========================
-CREAR INTEGRANTE
-========================= */
+      if (!usuario || !nombreVisible || !contrasena || !foto) {
+        return res.status(400).json({
+          error: "Usuario, nombre visible, contraseña y foto son obligatorios."
+        });
+      }
 
-app.post("/integrantes", async (req, res) => {
-  try {
-    const {
-      nombre,
-      rol,
-      presentacion,
-      foto
-    } = req.body;
+      /* =========================
+      VALIDAR IMAGEN
+      ========================= */
 
-    if (!nombre || !rol || !foto) {
-      return res.status(400).json({
-        error: "Nombre, rol y foto son obligatorios."
-      });
-    }
+      if (!foto.mimetype.startsWith("image/")) {
+        return res.status(400).json({
+          error: "El archivo debe ser una imagen."
+        });
+      }
 
-    const resultado = await pool.query(
-      `INSERT INTO integrantes
-      (nombre, rol, presentacion, foto)
-      VALUES ($1, $2, $3, $4)
-      RETURNING *`,
-      [
-        nombre,
-        rol,
-        presentacion || "",
-        foto
-      ]
-    );
+      if (foto.size > 5 * 1024 * 1024) {
+        return res.status(400).json({
+          error: "La imagen no puede superar los 5 MB."
+        });
+      }
 
-    res.status(201).json(resultado.rows[0]);
+      /* =========================
+      COMPROBAR USUARIO
+      ========================= */
 
-  } catch (error) {
-    console.error(error);
+      const usuarioExistente = await pool.query(
+        "SELECT id FROM cuentas WHERE usuario = $1",
+        [usuario]
+      );
 
-    res.status(500).json({
-      error: "Error al crear integrante."
-    });
-  }
-});
+      if (usuarioExistente.rows.length > 0) {
+        return res.status(409).json({
+          error: "Ese usuario ya existe."
+        });
+      }
 
-/* =========================
-EDITAR INTEGRANTE
-========================= */
+      /* =========================
+      HASH DE CONTRASEÑA
+      ========================= */
 
-app.put("/integrantes/:id", async (req, res) => {
-  try {
-    const id = req.params.id;
+      const contrasenaHash = await bcrypt.hash(
+        contrasena,
+        12
+      );
 
-    const {
-      nombre,
-      rol,
-      presentacion,
-      foto
-    } = req.body;
+      /* =========================
+      NOMBRE DE ARCHIVO
+      ========================= */
 
-    if (!nombre || !rol || !foto) {
-      return res.status(400).json({
-        error: "Nombre, rol y foto son obligatorios."
-      });
-    }
+      const extension =
+        foto.mimetype.split("/")[1] || "jpg";
 
-    const resultado = await pool.query(
-      `UPDATE integrantes
-      SET nombre = $1,
-          rol = $2,
-          presentacion = $3,
-          foto = $4
-      WHERE id = $5
-      RETURNING *`,
-      [
-        nombre,
-        rol,
-        presentacion || "",
-        foto,
-        id
-      ]
-    );
-
-    if (resultado.rows.length === 0) {
-      return res.status(404).json({
-        error: "Integrante no encontrado."
-      });
-    }
-
-    res.json(resultado.rows[0]);
-
-  } catch (error) {
-    console.error(error);
-
-    res.status(500).json({
-      error: "Error al editar integrante."
-    });
-  }
-});
-
-/* =========================
-ELIMINAR INTEGRANTE
-========================= */
-
-app.delete("/integrantes/:id", async (req, res) => {
-  try {
-    const id = req.params.id;
-
-    const resultado = await pool.query(
-      "DELETE FROM integrantes WHERE id = $1 RETURNING *",
-      [id]
-    );
-
-    if (resultado.rows.length === 0) {
-      return res.status(404).json({
-        error: "Integrante no encontrado."
-      });
-    }
-
-    res.json({
-      mensaje: "Integrante eliminado correctamente."
-    });
-
-  } catch (error) {
-    console.error(error);
-
-    res.status(500).json({
-      error: "Error al eliminar integrante."
-    });
-  }
-});
-
-/* =========================
-SERVIDOR
-========================= */
-
-async function iniciarServidor() {
-  await iniciarBaseDeDatos();
-
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`API funcionando en el puerto ${PORT}`);
-  });
-}
-
-iniciarServidor();
+      const nombreArchivo =
+        `${Date.now()}-${Math.random()
+          .toString(36)
+          .substring(2

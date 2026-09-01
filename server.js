@@ -10,10 +10,6 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// =====================================================
-// CONFIGURACIÓN
-// =====================================================
-
 const PORT = process.env.PORT || 3000;
 
 const pool = new Pool({
@@ -27,10 +23,6 @@ const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SECRET_KEY
 );
-
-// =====================================================
-// MULTER
-// =====================================================
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -50,27 +42,24 @@ const upload = multer({
   }
 });
 
-// =====================================================
+// ==========================================
 // INICIO
-// =====================================================
+// ==========================================
 
 app.get("/", (req, res) => {
   res.json({
-    mensaje: "API de Among Us funcionando correctamente.",
+    mensaje:
+      "API de Among Us funcionando correctamente.",
     estado: "online"
   });
 });
 
-// =====================================================
+// ==========================================
 // BASE DE DATOS
-// =====================================================
+// ==========================================
 
 async function iniciarBaseDeDatos() {
   try {
-    // -------------------------------------------------
-    // TABLA INTEGRANTES
-    // -------------------------------------------------
-
     await pool.query(`
       CREATE TABLE IF NOT EXISTS integrantes (
         id SERIAL PRIMARY KEY,
@@ -80,10 +69,6 @@ async function iniciarBaseDeDatos() {
         foto TEXT
       )
     `);
-
-    // -------------------------------------------------
-    // TABLA CUENTAS
-    // -------------------------------------------------
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS cuentas (
@@ -98,10 +83,6 @@ async function iniciarBaseDeDatos() {
         estado TEXT DEFAULT 'Pendiente'
       )
     `);
-
-    // -------------------------------------------------
-    // TABLA SOLICITUDES STAFF
-    // -------------------------------------------------
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS solicitudes_staff (
@@ -120,7 +101,9 @@ async function iniciarBaseDeDatos() {
       )
     `);
 
-    console.log("Base de datos preparada correctamente.");
+    console.log(
+      "Base de datos preparada correctamente."
+    );
   } catch (error) {
     console.error(
       "Error al preparar la base de datos:",
@@ -131,15 +114,19 @@ async function iniciarBaseDeDatos() {
 
 iniciarBaseDeDatos();
 
-// =====================================================
+// ==========================================
 // INTEGRANTES
-// =====================================================
+// ==========================================
 
-// Obtener todos los integrantes
+// Obtener todos
 app.get("/integrantes", async (req, res) => {
   try {
     const resultado = await pool.query(
-      "SELECT * FROM integrantes ORDER BY id ASC"
+      `
+      SELECT *
+      FROM integrantes
+      ORDER BY id ASC
+      `
     );
 
     res.json(resultado.rows);
@@ -147,161 +134,195 @@ app.get("/integrantes", async (req, res) => {
     console.error(error);
 
     res.status(500).json({
-      error: "Error al obtener los integrantes."
+      error:
+        "Error al obtener los integrantes."
     });
   }
 });
 
-// Obtener un integrante
-app.get("/integrantes/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
+// Obtener uno
+app.get(
+  "/integrantes/:id",
+  async (req, res) => {
+    try {
+      const { id } = req.params;
 
-    const resultado = await pool.query(
-      "SELECT * FROM integrantes WHERE id = $1",
-      [id]
-    );
+      const resultado = await pool.query(
+        `
+        SELECT *
+        FROM integrantes
+        WHERE id = $1
+        `,
+        [id]
+      );
 
-    if (resultado.rows.length === 0) {
-      return res.status(404).json({
-        error: "Integrante no encontrado."
+      if (resultado.rows.length === 0) {
+        return res.status(404).json({
+          error:
+            "Integrante no encontrado."
+        });
+      }
+
+      res.json(resultado.rows[0]);
+    } catch (error) {
+      console.error(error);
+
+      res.status(500).json({
+        error:
+          "Error al obtener el integrante."
       });
     }
-
-    res.json(resultado.rows[0]);
-  } catch (error) {
-    console.error(error);
-
-    res.status(500).json({
-      error: "Error al obtener el integrante."
-    });
   }
-});
+);
 
-// Crear integrante
-app.post("/integrantes", async (req, res) => {
-  try {
-    const {
-      nombre,
-      rol,
-      presentacion,
-      foto
-    } = req.body;
-
-    if (!nombre) {
-      return res.status(400).json({
-        error: "El nombre es obligatorio."
-      });
-    }
-
-    const resultado = await pool.query(
-      `
-      INSERT INTO integrantes
-      (nombre, rol, presentacion, foto)
-      VALUES ($1, $2, $3, $4)
-      RETURNING *
-      `,
-      [
+// Crear
+app.post(
+  "/integrantes",
+  async (req, res) => {
+    try {
+      const {
         nombre,
-        rol || "",
-        presentacion || "",
-        foto || ""
-      ]
-    );
+        rol,
+        presentacion,
+        foto
+      } = req.body;
 
-    res.status(201).json(resultado.rows[0]);
-  } catch (error) {
-    console.error(error);
+      if (!nombre) {
+        return res.status(400).json({
+          error:
+            "El nombre es obligatorio."
+        });
+      }
 
-    res.status(500).json({
-      error: "Error al crear el integrante."
-    });
+      const resultado = await pool.query(
+        `
+        INSERT INTO integrantes
+        (
+          nombre,
+          rol,
+          presentacion,
+          foto
+        )
+        VALUES
+        ($1, $2, $3, $4)
+        RETURNING *
+        `,
+        [
+          nombre,
+          rol || "",
+          presentacion || "",
+          foto || ""
+        ]
+      );
+
+      res.status(201).json(
+        resultado.rows[0]
+      );
+    } catch (error) {
+      console.error(error);
+
+      res.status(500).json({
+        error:
+          "Error al crear el integrante."
+      });
+    }
   }
-});
+);
 
-// Actualizar integrante
-app.put("/integrantes/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
+// Actualizar
+app.put(
+  "/integrantes/:id",
+  async (req, res) => {
+    try {
+      const { id } = req.params;
 
-    const {
-      nombre,
-      rol,
-      presentacion,
-      foto
-    } = req.body;
-
-    const resultado = await pool.query(
-      `
-      UPDATE integrantes
-      SET
-        nombre = $1,
-        rol = $2,
-        presentacion = $3,
-        foto = $4
-      WHERE id = $5
-      RETURNING *
-      `,
-      [
+      const {
         nombre,
-        rol || "",
-        presentacion || "",
-        foto || "",
-        id
-      ]
-    );
+        rol,
+        presentacion,
+        foto
+      } = req.body;
 
-    if (resultado.rows.length === 0) {
-      return res.status(404).json({
-        error: "Integrante no encontrado."
+      const resultado = await pool.query(
+        `
+        UPDATE integrantes
+        SET
+          nombre = $1,
+          rol = $2,
+          presentacion = $3,
+          foto = $4
+        WHERE id = $5
+        RETURNING *
+        `,
+        [
+          nombre,
+          rol || "",
+          presentacion || "",
+          foto || "",
+          id
+        ]
+      );
+
+      if (resultado.rows.length === 0) {
+        return res.status(404).json({
+          error:
+            "Integrante no encontrado."
+        });
+      }
+
+      res.json(resultado.rows[0]);
+    } catch (error) {
+      console.error(error);
+
+      res.status(500).json({
+        error:
+          "Error al actualizar el integrante."
       });
     }
-
-    res.json(resultado.rows[0]);
-  } catch (error) {
-    console.error(error);
-
-    res.status(500).json({
-      error: "Error al actualizar el integrante."
-    });
   }
-});
+);
 
-// Eliminar integrante
-app.delete("/integrantes/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
+// Eliminar
+app.delete(
+  "/integrantes/:id",
+  async (req, res) => {
+    try {
+      const { id } = req.params;
 
-    const resultado = await pool.query(
-      `
-      DELETE FROM integrantes
-      WHERE id = $1
-      RETURNING *
-      `,
-      [id]
-    );
+      const resultado = await pool.query(
+        `
+        DELETE FROM integrantes
+        WHERE id = $1
+        RETURNING *
+        `,
+        [id]
+      );
 
-    if (resultado.rows.length === 0) {
-      return res.status(404).json({
-        error: "Integrante no encontrado."
+      if (resultado.rows.length === 0) {
+        return res.status(404).json({
+          error:
+            "Integrante no encontrado."
+        });
+      }
+
+      res.json({
+        mensaje:
+          "Integrante eliminado correctamente."
+      });
+    } catch (error) {
+      console.error(error);
+
+      res.status(500).json({
+        error:
+          "Error al eliminar el integrante."
       });
     }
-
-    res.json({
-      mensaje: "Integrante eliminado correctamente."
-    });
-  } catch (error) {
-    console.error(error);
-
-    res.status(500).json({
-      error: "Error al eliminar el integrante."
-    });
   }
-});
+);
 
-// =====================================================
+// ==========================================
 // REGISTRO DE CUENTAS
-// =====================================================
+// ==========================================
 
 app.post(
   "/registro",
@@ -316,10 +337,6 @@ app.post(
 
       const foto = req.file;
 
-      // -------------------------------------------------
-      // VALIDACIONES
-      // -------------------------------------------------
-
       if (
         !usuario ||
         !nombreVisible ||
@@ -327,84 +344,89 @@ app.post(
         !foto
       ) {
         return res.status(400).json({
-          error: "Todos los campos son obligatorios."
+          error:
+            "Todos los campos son obligatorios."
         });
       }
 
-      if (!foto.mimetype.startsWith("image/")) {
+      if (
+        !foto.mimetype.startsWith("image/")
+      ) {
         return res.status(400).json({
-          error: "La foto debe ser una imagen."
+          error:
+            "La foto debe ser una imagen."
         });
       }
 
-      // -------------------------------------------------
-      // COMPROBAR USUARIO
-      // -------------------------------------------------
+      const usuarioExistente =
+        await pool.query(
+          `
+          SELECT id
+          FROM cuentas
+          WHERE LOWER(usuario) = LOWER($1)
+          `,
+          [usuario]
+        );
 
-      const usuarioExistente = await pool.query(
-        `
-        SELECT id
-        FROM cuentas
-        WHERE LOWER(usuario) = LOWER($1)
-        `,
-        [usuario]
-      );
-
-      if (usuarioExistente.rows.length > 0) {
+      if (
+        usuarioExistente.rows.length > 0
+      ) {
         return res.status(409).json({
-          error: "Ese usuario ya existe."
+          error:
+            "Ese usuario ya existe."
         });
       }
 
-      // -------------------------------------------------
-      // HASH DE CONTRASEÑA
-      // -------------------------------------------------
-
-      const contrasenaHash = await bcrypt.hash(
-        contrasena,
-        12
-      );
-
-      // -------------------------------------------------
-      // EXTENSIÓN
-      // -------------------------------------------------
+      const contrasenaHash =
+        await bcrypt.hash(
+          contrasena,
+          12
+        );
 
       let extension = "jpg";
 
-      if (foto.mimetype === "image/png") {
+      if (
+        foto.mimetype ===
+        "image/png"
+      ) {
         extension = "png";
-      } else if (foto.mimetype === "image/webp") {
+      } else if (
+        foto.mimetype ===
+        "image/webp"
+      ) {
         extension = "webp";
-      } else if (foto.mimetype === "image/gif") {
+      } else if (
+        foto.mimetype ===
+        "image/gif"
+      ) {
         extension = "gif";
-      } else if (foto.mimetype === "image/jpeg") {
+      } else if (
+        foto.mimetype ===
+        "image/jpeg"
+      ) {
         extension = "jpg";
       }
 
-      // -------------------------------------------------
-      // NOMBRE DEL ARCHIVO
-      // -------------------------------------------------
-
       const nombreArchivo =
-        `${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`;
+        `${Date.now()}-${Math.random()
+          .toString(36)
+          .slice(2)}.${extension}`;
 
       const rutaArchivo =
         `perfiles/${nombreArchivo}`;
 
-      // -------------------------------------------------
-      // SUBIR FOTO A SUPABASE
-      // -------------------------------------------------
-
-      const subida = await supabase.storage
-        .from("profile-images")
-        .upload(
-          rutaArchivo,
-          foto.buffer,
-          {
-            contentType: foto.mimetype,
-            upsert: false
-          }
-        );
+      const subida =
+        await supabase.storage
+          .from("profile-images")
+          .upload(
+            rutaArchivo,
+            foto.buffer,
+            {
+              contentType:
+                foto.mimetype,
+              upsert: false
+            }
+          );
 
       if (subida.error) {
         console.error(
@@ -413,60 +435,66 @@ app.post(
         );
 
         return res.status(500).json({
-          error: "No se pudo guardar la foto de perfil."
+          error:
+            "No se pudo guardar la foto de perfil."
         });
       }
-
-      // -------------------------------------------------
-      // URL PÚBLICA
-      // -------------------------------------------------
 
       const publicUrl =
         supabase.storage
           .from("profile-images")
-          .getPublicUrl(rutaArchivo)
+          .getPublicUrl(
+            rutaArchivo
+          )
           .data.publicUrl;
 
-      // -------------------------------------------------
-      // CREAR CUENTA
-      // -------------------------------------------------
-
-      const resultado = await pool.query(
-        `
-        INSERT INTO cuentas
-        (
-          usuario,
-          nombre_visible,
-          contrasena_hash,
-          foto,
-          roles,
-          subroles,
-          estado
-        )
-        VALUES
-        ($1, $2, $3, $4, '{}', '{}', 'Pendiente')
-        RETURNING
-          id,
-          usuario,
-          nombre_visible,
-          foto,
-          roles,
-          subroles,
-          fecha_creacion,
-          estado
-        `,
-        [
-          usuario,
-          nombreVisible,
-          contrasenaHash,
-          publicUrl
-        ]
-      );
+      const resultado =
+        await pool.query(
+          `
+          INSERT INTO cuentas
+          (
+            usuario,
+            nombre_visible,
+            contrasena_hash,
+            foto,
+            roles,
+            subroles,
+            estado
+          )
+          VALUES
+          (
+            $1,
+            $2,
+            $3,
+            $4,
+            '{}',
+            '{}',
+            'Pendiente'
+          )
+          RETURNING
+            id,
+            usuario,
+            nombre_visible,
+            foto,
+            roles,
+            subroles,
+            fecha_creacion,
+            estado
+          `,
+          [
+            usuario,
+            nombreVisible,
+            contrasenaHash,
+            publicUrl
+          ]
+        );
 
       res.status(201).json({
         mensaje:
           "Solicitud de cuenta creada correctamente.",
-        cuenta: resultado.rows[0]
+
+        cuenta:
+          resultado.rows[0]
       });
     } catch (error) {
       console.error(
@@ -475,17 +503,174 @@ app.post(
       );
 
       res.status(500).json({
-        error: "Error interno al crear la cuenta."
+        error:
+          "Error interno al crear la cuenta."
       });
     }
   }
 );
 
-// =====================================================
-// SOLICITUDES PARA STAFF
-// =====================================================
+// ==========================================
+// CUENTAS PENDIENTES
+// ==========================================
 
-// Crear solicitud para Staff
+// Obtener cuentas pendientes
+app.get(
+  "/cuentas-pendientes",
+  async (req, res) => {
+    try {
+      const resultado =
+        await pool.query(
+          `
+          SELECT
+            id,
+            usuario,
+            nombre_visible,
+            foto,
+            roles,
+            subroles,
+            fecha_creacion,
+            estado
+          FROM cuentas
+          WHERE estado = 'Pendiente'
+          ORDER BY fecha_creacion ASC
+          `
+        );
+
+      res.json(resultado.rows);
+    } catch (error) {
+      console.error(
+        "Error al obtener cuentas pendientes:",
+        error
+      );
+
+      res.status(500).json({
+        error:
+          "Error al obtener las cuentas pendientes."
+      });
+    }
+  }
+);
+
+// Aceptar cuenta
+app.patch(
+  "/cuentas/:id/aprobar",
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const resultado =
+        await pool.query(
+          `
+          UPDATE cuentas
+          SET estado = 'Activa'
+          WHERE id = $1
+          AND estado = 'Pendiente'
+          RETURNING
+            id,
+            usuario,
+            nombre_visible,
+            foto,
+            roles,
+            subroles,
+            fecha_creacion,
+            estado
+          `,
+          [id]
+        );
+
+      if (
+        resultado.rows.length === 0
+      ) {
+        return res.status(404).json({
+          error:
+            "Cuenta no encontrada o ya fue procesada."
+        });
+      }
+
+      res.json({
+        mensaje:
+          "Cuenta aceptada correctamente.",
+
+        cuenta:
+          resultado.rows[0]
+      });
+    } catch (error) {
+      console.error(
+        "Error al aceptar cuenta:",
+        error
+      );
+
+      res.status(500).json({
+        error:
+          "Error al aceptar la cuenta."
+      });
+    }
+  }
+);
+
+// Rechazar cuenta
+app.patch(
+  "/cuentas/:id/rechazar",
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const resultado =
+        await pool.query(
+          `
+          UPDATE cuentas
+          SET estado = 'Rechazada'
+          WHERE id = $1
+          AND estado = 'Pendiente'
+          RETURNING
+            id,
+            usuario,
+            nombre_visible,
+            foto,
+            roles,
+            subroles,
+            fecha_creacion,
+            estado
+          `,
+          [id]
+        );
+
+      if (
+        resultado.rows.length === 0
+      ) {
+        return res.status(404).json({
+          error:
+            "Cuenta no encontrada o ya fue procesada."
+        });
+      }
+
+      res.json({
+        mensaje:
+          "Cuenta rechazada correctamente.",
+
+        cuenta:
+          resultado.rows[0]
+      });
+    } catch (error) {
+      console.error(
+        "Error al rechazar cuenta:",
+        error
+      );
+
+      res.status(500).json({
+        error:
+          "Error al rechazar la cuenta."
+      });
+    }
+  }
+);
+
+// ==========================================
+// SOLICITUDES DE STAFF
+// ==========================================
+
+// Crear solicitud
 app.post(
   "/solicitudes-staff",
   async (req, res) => {
@@ -502,46 +687,42 @@ app.post(
         });
       }
 
-      // -------------------------------------------------
-      // BUSCAR CUENTA
-      // -------------------------------------------------
+      const cuenta =
+        await pool.query(
+          `
+          SELECT
+            id,
+            usuario,
+            nombre_visible,
+            estado,
+            roles
+          FROM cuentas
+          WHERE id = $1
+          `,
+          [cuentaId]
+        );
 
-      const cuenta = await pool.query(
-        `
-        SELECT
-          id,
-          usuario,
-          nombre_visible,
-          estado,
-          roles
-        FROM cuentas
-        WHERE id = $1
-        `,
-        [cuentaId]
-      );
-
-      if (cuenta.rows.length === 0) {
+      if (
+        cuenta.rows.length === 0
+      ) {
         return res.status(404).json({
-          error: "La cuenta no existe."
+          error:
+            "La cuenta no existe."
         });
       }
 
-      const datosCuenta = cuenta.rows[0];
+      const datosCuenta =
+        cuenta.rows[0];
 
-      // -------------------------------------------------
-      // COMPROBAR ESTADO DE CUENTA
-      // -------------------------------------------------
-
-      if (datosCuenta.estado !== "Activa") {
+      if (
+        datosCuenta.estado !==
+        "Activa"
+      ) {
         return res.status(403).json({
           error:
             "La cuenta debe estar activa para solicitar Staff."
         });
       }
-
-      // -------------------------------------------------
-      // COMPROBAR SI YA TIENE STAFF
-      // -------------------------------------------------
 
       const roles =
         datosCuenta.roles || [];
@@ -549,7 +730,8 @@ app.post(
       if (
         roles.some(
           (rol) =>
-            String(rol).toLowerCase() ===
+            String(rol)
+              .toLowerCase() ===
             "staff"
         )
       ) {
@@ -558,10 +740,6 @@ app.post(
             "Esta cuenta ya tiene el rol Staff."
         });
       }
-
-      // -------------------------------------------------
-      // COMPROBAR SOLICITUD PENDIENTE
-      // -------------------------------------------------
 
       const solicitudExistente =
         await pool.query(
@@ -583,36 +761,41 @@ app.post(
         });
       }
 
-      // -------------------------------------------------
-      // CREAR SOLICITUD
-      // -------------------------------------------------
-
-      const resultado = await pool.query(
-        `
-        INSERT INTO solicitudes_staff
-        (
-          cuenta_id,
-          usuario,
-          nombre_visible,
-          motivo,
-          estado
-        )
-        VALUES
-        ($1, $2, $3, $4, 'Pendiente')
-        RETURNING *
-        `,
-        [
-          datosCuenta.id,
-          datosCuenta.usuario,
-          datosCuenta.nombre_visible,
-          motivo
-        ]
-      );
+      const resultado =
+        await pool.query(
+          `
+          INSERT INTO solicitudes_staff
+          (
+            cuenta_id,
+            usuario,
+            nombre_visible,
+            motivo,
+            estado
+          )
+          VALUES
+          (
+            $1,
+            $2,
+            $3,
+            $4,
+            'Pendiente'
+          )
+          RETURNING *
+          `,
+          [
+            datosCuenta.id,
+            datosCuenta.usuario,
+            datosCuenta.nombre_visible,
+            motivo
+          ]
+        );
 
       res.status(201).json({
         mensaje:
           "Solicitud para Staff enviada correctamente.",
-        solicitud: resultado.rows[0]
+
+        solicitud:
+          resultado.rows[0]
       });
     } catch (error) {
       console.error(
@@ -628,28 +811,26 @@ app.post(
   }
 );
 
-// =====================================================
-// VER SOLICITUDES STAFF
-// =====================================================
-
+// Obtener solicitudes Staff
 app.get(
   "/solicitudes-staff",
   async (req, res) => {
     try {
-      const resultado = await pool.query(
-        `
-        SELECT
-          id,
-          cuenta_id,
-          usuario,
-          nombre_visible,
-          motivo,
-          fecha_creacion,
-          estado
-        FROM solicitudes_staff
-        ORDER BY fecha_creacion DESC
-        `
-      );
+      const resultado =
+        await pool.query(
+          `
+          SELECT
+            id,
+            cuenta_id,
+            usuario,
+            nombre_visible,
+            motivo,
+            fecha_creacion,
+            estado
+          FROM solicitudes_staff
+          ORDER BY fecha_creacion DESC
+          `
+        );
 
       res.json(resultado.rows);
     } catch (error) {
@@ -663,10 +844,7 @@ app.get(
   }
 );
 
-// =====================================================
-// APROBAR SOLICITUD STAFF
-// =====================================================
-
+// Aceptar solicitud Staff
 app.patch(
   "/solicitudes-staff/:id/aprobar",
   async (req, res) => {
@@ -676,11 +854,9 @@ app.patch(
     try {
       const { id } = req.params;
 
-      await cliente.query("BEGIN");
-
-      // -------------------------------------------------
-      // OBTENER SOLICITUD
-      // -------------------------------------------------
+      await cliente.query(
+        "BEGIN"
+      );
 
       const solicitud =
         await cliente.query(
@@ -696,7 +872,9 @@ app.patch(
       if (
         solicitud.rows.length === 0
       ) {
-        await cliente.query("ROLLBACK");
+        await cliente.query(
+          "ROLLBACK"
+        );
 
         return res.status(404).json({
           error:
@@ -708,9 +886,12 @@ app.patch(
         solicitud.rows[0];
 
       if (
-        datos.estado !== "Pendiente"
+        datos.estado !==
+        "Pendiente"
       ) {
-        await cliente.query("ROLLBACK");
+        await cliente.query(
+          "ROLLBACK"
+        );
 
         return res.status(409).json({
           error:
@@ -718,29 +899,28 @@ app.patch(
         });
       }
 
-      // -------------------------------------------------
-      // AGREGAR ROL STAFF
-      // -------------------------------------------------
-
       await cliente.query(
         `
         UPDATE cuentas
         SET
           roles =
             CASE
-              WHEN NOT ('Staff' = ANY(roles))
-              THEN array_append(roles, 'Staff')
+              WHEN NOT (
+                'Staff' = ANY(roles)
+              )
+              THEN array_append(
+                roles,
+                'Staff'
+              )
               ELSE roles
             END,
+
           estado = 'Activa'
+
         WHERE id = $1
         `,
         [datos.cuenta_id]
       );
-
-      // -------------------------------------------------
-      // ACTUALIZAR SOLICITUD
-      // -------------------------------------------------
 
       const resultado =
         await cliente.query(
@@ -753,16 +933,21 @@ app.patch(
           [id]
         );
 
-      await cliente.query("COMMIT");
+      await cliente.query(
+        "COMMIT"
+      );
 
       res.json({
         mensaje:
           "Solicitud aceptada correctamente.",
+
         solicitud:
           resultado.rows[0]
       });
     } catch (error) {
-      await cliente.query("ROLLBACK");
+      await cliente.query(
+        "ROLLBACK"
+      );
 
       console.error(
         "Error al aprobar solicitud:",
@@ -779,10 +964,7 @@ app.patch(
   }
 );
 
-// =====================================================
-// RECHAZAR SOLICITUD STAFF
-// =====================================================
-
+// Rechazar solicitud Staff
 app.patch(
   "/solicitudes-staff/:id/rechazar",
   async (req, res) => {
@@ -813,6 +995,7 @@ app.patch(
       res.json({
         mensaje:
           "Solicitud rechazada correctamente.",
+
         solicitud:
           resultado.rows[0]
       });
@@ -830,17 +1013,19 @@ app.patch(
   }
 );
 
-// =====================================================
+// ==========================================
 // ERRORES DE MULTER
-// =====================================================
+// ==========================================
 
 app.use(
   (error, req, res, next) => {
     if (
-      error instanceof multer.MulterError
+      error instanceof
+      multer.MulterError
     ) {
       if (
-        error.code === "LIMIT_FILE_SIZE"
+        error.code ===
+        "LIMIT_FILE_SIZE"
       ) {
         return res.status(400).json({
           error:
@@ -857,21 +1042,10 @@ app.use(
     if (
       error &&
       error.message ===
-        "El archivo debe ser una imagen."
-    ) {
-      return res.status(400).json({
-        error:
-          "El archivo debe ser una imagen."
-      });
-    }
-
-    next(error);
-  }
-);
-
-// =====================================================
-// ERROR GENERAL
-// =====================================================
+        "E
+      // ==========================================
+// ERRORES GENERALES
+// ==========================================
 
 app.use(
   (error, req, res, next) => {
@@ -886,10 +1060,9 @@ app.use(
     });
   }
 );
-
-// =====================================================
+    // ==========================================
 // SERVIDOR
-// =====================================================
+// ==========================================
 
 app.listen(
   PORT,
